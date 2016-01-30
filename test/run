@@ -1,0 +1,106 @@
+#!/usr/bin/python3
+
+# Copyright © 2014 Jakub Wilk <jwilk@jwilk.net>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the “Software”), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+import contextlib
+import os
+import sys
+import signal
+import threading
+
+import firefox
+import httpd
+
+class Timeout(RuntimeError):
+    default = 20
+
+    def raise_(*args, **kwargs):
+        raise Timeout
+
+@contextlib.contextmanager
+def check(message, *, timeout=Timeout.default):
+    if timeout is not None:
+        signal.signal(signal.SIGALRM, Timeout.raise_)
+        signal.alarm(timeout)
+    print(message, '...', end=' ')
+    sys.stdout.flush()
+    try:
+        yield
+        print('ok')
+    except Timeout:
+        print('TIMEOUT')
+        raise
+    except Exception:
+        print('ERROR')
+        raise
+    finally:
+        if timeout is not None:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, signal.SIG_DFL)
+
+def main():
+    with firefox.clean_home_dir():
+        _main()
+
+def _main():
+    url = httpd.run()
+    with firefox.Firefox(url) as ff:
+        with check('[1] untrusted connection'):
+            main_window_id = ff.get_window_id('Untrusted Connection')
+        with check('[1] open "add security exception" dialog'):
+            ff.talk(main_window_id,
+                'ctrl+f',
+                '<i understand the risks>',
+                'shift+Tab', 'space', 'ctrl+f',
+                '<add exception>',
+                'shift+Tab', 'space',
+            )
+        with check('[1] add security exception'):
+            ff.talk('Add Security Exception',
+                'alt+c',
+            )
+        with check('[1] page loaded'):
+            httpd.page_event.wait()
+        with check('[1] quit Firefox'):
+            ff.talk(main_window_id, 'ctrl+q')
+        with check('[1] wait for Firefox termination'):
+            ff.wait()
+    httpd.page_event.clear()
+    with firefox.Firefox(url) as ff:
+        def alarm_on_page_event():
+            httpd.page_event.wait()
+            os.kill(os.getpid(), signal.SIGALRM)
+        thread = threading.Thread(target=alarm_on_page_event, daemon=True)
+        thread.start()
+        with check('[2] untrusted connection'):
+            try:
+                ff.talk('Untrusted Connection', 'ctrl+q')
+            except Timeout:
+                if httpd.page_event.is_set():
+                    raise RuntimeError('trusted connection')
+                raise
+        with check('[2] wait for Firefox termination'):
+            ff.wait()
+
+if __name__ == '__main__':
+    main()
+
+# vim:ts=4 sts=4 sw=4 et
