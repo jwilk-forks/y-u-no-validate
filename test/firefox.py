@@ -65,11 +65,11 @@ class Firefox(object):
         output = ipc.check_output(cmdline)
         return int(output)
 
-    def talk(self, window, *args):
+    def activate_window(self, window):
         cmdline = ['xdotool']
         if isinstance(window, int):
             cmdline += [
-                'key', '--window', str(window)
+                'windowactivate', '--sync', str(window)
             ]
         else:
             cmdline += [
@@ -79,8 +79,13 @@ class Firefox(object):
                     '--all',
                     '--pid', str(self.child.pid),
                     '--name', window,
-                'key',
+                'windowactivate', '--sync',
             ]
+        ipc.check_call(cmdline)
+
+    def talk(self, window, *args):
+        self.activate_window(window)
+        cmdline = ['xdotool', 'key']
         for arg in args:
             if arg[:1] + arg[-1:] == '<>':
                 for ch in arg[1:-1]:
