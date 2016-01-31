@@ -63,14 +63,19 @@ def main():
 def _main():
     url = httpd.run()
     with firefox.Firefox(url) as ff:
+        if ff.version >= 44:
+            untrusted_connection_title = 'Insecure Connection'
+            advanced_options_button = 'Advanced'
+        else:
+            untrusted_connection_title = 'Untrusted Connection'
+            advanced_options_button = 'I Understand The Risks'
         with check('[1] untrusted connection'):
-            main_window_id = ff.get_window_id('Untrusted Connection')
+            main_window_id = ff.get_window_id(untrusted_connection_title)
         with check('[1] open "add security exception" dialog'):
             ff.talk(main_window_id,
-                'ctrl+f',
-                '<i understand the risks>',
-                'shift+Tab', 'space', 'ctrl+f',
-                '<add exception>',
+                'ctrl+f', '<{0}>'.format(advanced_options_button.lower()),
+                'shift+Tab', 'space',
+                'ctrl+f', '<add exception>',
                 'shift+Tab', 'space',
             )
         with check('[1] add security exception'):
@@ -92,7 +97,7 @@ def _main():
         thread.start()
         with check('[2] untrusted connection'):
             try:
-                ff.talk('Untrusted Connection', 'ctrl+q')
+                ff.talk(untrusted_connection_title, 'ctrl+q')
             except Timeout:
                 if httpd.page_event.is_set():
                     raise RuntimeError('trusted connection')

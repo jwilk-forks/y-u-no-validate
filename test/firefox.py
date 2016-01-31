@@ -20,6 +20,7 @@
 
 import contextlib
 import os
+import re
 import shutil
 import subprocess as ipc
 import tempfile
@@ -30,6 +31,10 @@ class Firefox(object):
     def __init__(self, url):
         self.url = url
         self.child = None
+        version = ipc.check_output(['firefox', '--version'])
+        version = version.decode('ASCII')
+        version = re.search(r'(\d+)', version).group(0)
+        self.version = int(version)
 
     def __enter__(self):
         with open(os.devnull, 'wb') as dev_null:
