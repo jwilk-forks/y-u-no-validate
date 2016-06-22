@@ -74,9 +74,9 @@ def _main():
         with check('[1] open "add security exception" dialog'):
             ff.talk(main_window_id,
                 'ctrl+f', '<{0}>'.format(advanced_options_button.lower()),
-                'shift+Tab', 'space',
+                'Escape', 'shift+Tab', 'space',
                 'ctrl+f', '<add exception>',
-                'shift+Tab', 'space',
+                'Escape', 'shift+Tab', 'space',
             )
         with check('[1] add security exception'):
             ff.talk('Add Security Exception',
