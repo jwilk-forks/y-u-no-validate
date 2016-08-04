@@ -19,6 +19,7 @@
 # SOFTWARE.
 
 import contextlib
+import datetime
 import os
 import re
 import shutil
@@ -118,21 +119,14 @@ def get_addon_id():
         id_elem = rdf_tree.find('.//em:id', namespaces=xml_namespaces)
         return id_elem.text
 
-extensions_ini = '''\
-[ExtensionDirs]
-Extension0=/usr/share/mozilla/extensions/{firefox_id}/{addon_id}
-'''.format(
-    firefox_id='{ec8030f7-c20a-464f-9b0e-13a3a9e97384}',
-    addon_id=get_addon_id()
-)
-
 prefs_js = '''
 user_pref("network.proxy.http", "127.0.0.1");
 user_pref("network.proxy.http_port", 9);
 user_pref("network.proxy.ssl", "127.0.0.1");
 user_pref("network.proxy.ssl_port", 9);
 user_pref("network.proxy.type", 1);
-'''
+user_pref("extensions.enabledItems", "{addon_id}:{today}");
+'''.format(addon_id=get_addon_id(), today=datetime.date.today())
 
 @contextlib.contextmanager
 def clean_home_dir():
@@ -142,8 +136,6 @@ def clean_home_dir():
         os.makedirs(mozilla_home + '/default')
         with open(mozilla_home + '/profiles.ini', 'wt', encoding='ASCII') as file:
             file.write(profiles_ini)
-        with open(mozilla_home + '/default/extensions.ini', 'wt', encoding='ASCII') as file:
-            file.write(extensions_ini)
         with open(mozilla_home + '/default/prefs.js', 'wt', encoding='ASCII') as file:
             file.write(prefs_js)
         old_home = os.environ['HOME']
